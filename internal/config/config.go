@@ -19,31 +19,12 @@ type Config struct {
 func Load() (Config, error) {
 	var errs []error
 
-	str := func(key string) string {
-		v := os.Getenv(key)
-		if v == "" {
-			errs = append(errs, fmt.Errorf("%s is required", key))
-		}
-		return v
-	}
-	dur := func(key string) time.Duration {
-		v := str(key)
-		if v == "" {
-			return 0
-		}
-		d, err := time.ParseDuration(v)
-		if err != nil || d <= 0 {
-			errs = append(errs, fmt.Errorf("%s must be a positive duration like 15m", key))
-		}
-		return d
-	}
-
 	cfg := Config{
-		DatabaseURL:     str("DATABASE_URL"),
-		HTTPPort:        str("HTTP_PORT"),
-		JWTSecret:       str("JWT_SECRET"),
-		AccessTokenTTL:  dur("ACCESS_TOKEN_TTL"),
-		RefreshTokenTTL: dur("REFRESH_TOKEN_TTL"),
+		DatabaseURL:     requiredString("DATABASE_URL", &errs),
+		HTTPPort:        requiredString("HTTP_PORT", &errs),
+		JWTSecret:       requiredString("JWT_SECRET", &errs),
+		AccessTokenTTL:  requiredDuration("ACCESS_TOKEN_TTL", &errs),
+		RefreshTokenTTL: requiredDuration("REFRESH_TOKEN_TTL", &errs),
 	}
 
 	// HS256 needs a key at least as long as its 256-bit hash.
@@ -55,4 +36,24 @@ func Load() (Config, error) {
 		return Config{}, errors.Join(errs...)
 	}
 	return cfg, nil
+}
+
+func requiredString(key string, errs *[]error) string {
+	v := os.Getenv(key)
+	if v == "" {
+		*errs = append(*errs, fmt.Errorf("%s is required", key))
+	}
+	return v
+}
+
+func requiredDuration(key string, errs *[]error) time.Duration {
+	v := requiredString(key, errs)
+	if v == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a positive duration like 15m", key))
+	}
+	return d
 }
