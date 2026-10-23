@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,14 +9,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/mujtaba91/ticketing-api/internal/auth"
+	"github.com/mujtaba91/ticketing-api/internal/config"
+	"github.com/mujtaba91/ticketing-api/internal/httpx"
 )
 
-func NewRouter(pool *pgxpool.Pool) http.Handler {
+func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Recoverer)
+	r.Use(httpx.Recoverer)
 
 	r.Get("/health", health(pool))
+	r.Route("/auth", auth.NewHandler(pool, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL).Routes)
 
 	return r
 }
@@ -33,8 +37,6 @@ func health(pool *pgxpool.Pool) http.HandlerFunc {
 			status, code = "unavailable", http.StatusServiceUnavailable
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": status})
+		httpx.WriteJSON(w, code, map[string]string{"status": status})
 	}
 }

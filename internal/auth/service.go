@@ -11,10 +11,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/mujtaba91/ticketing-api/internal/apperr"
 )
 
 // One error for unknown email and wrong password, so login cannot reveal which emails exist.
-var ErrInvalidCredentials = errors.New("invalid email or password")
+var ErrInvalidCredentials = apperr.Unauthorized("invalid email or password")
 
 type authService struct {
 	store           authStore

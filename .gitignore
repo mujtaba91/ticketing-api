@@ -1,3 +1,4 @@
 .env
 bin/
 claude.md
+.DS_Store
