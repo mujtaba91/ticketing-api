@@ -17,6 +17,7 @@ var (
 	ErrEmailTaken           = apperr.Conflict("email already registered")
 	ErrUserNotFound         = errors.New("user not found")
 	ErrRefreshTokenNotFound = errors.New("refresh token not found")
+	ErrRefreshTokenRevoked  = errors.New("refresh token already revoked")
 )
 
 type User struct {
@@ -102,4 +103,33 @@ func (s *authStore) RefreshTokenByHash(ctx context.Context, tokenHash string) (R
 		return RefreshToken{}, fmt.Errorf("scan refresh token: %w", err)
 	}
 	return t, nil
+}
+
+// RevokeRefreshToken only revokes a live token, so of two concurrent requests with the same token only one wins.
+func (s *authStore) RevokeRefreshToken(ctx context.Context, id string) (RefreshToken, error) {
+	var t RefreshToken
+	err := s.db.QueryRow(ctx,
+		"UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING id, user_id, version, expires_at, revoked_at",
+		id).Scan(&t.ID, &t.UserID, &t.Version, &t.ExpiresAt, &t.RevokedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RefreshToken{}, ErrRefreshTokenRevoked
+	}
+	if err != nil {
+		return RefreshToken{}, fmt.Errorf("revoke refresh token: %w", err)
+	}
+	return t, nil
+}
+
+func (s *authStore) BumpTokenVersion(ctx context.Context, userID string) (int, error) {
+	var version int
+	err := s.db.QueryRow(ctx,
+		"UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version",
+		userID).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrUserNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("bump token version: %w", err)
+	}
+	return version, nil
 }

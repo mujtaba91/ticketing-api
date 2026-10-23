@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mujtaba91/ticketing-api/internal/apperr"
-	"github.com/mujtaba91/ticketing-api/internal/database"
 	"github.com/mujtaba91/ticketing-api/internal/httpx"
 )
 
@@ -27,13 +27,14 @@ type Handler struct {
 	service *authService
 }
 
-func NewHandler(db database.DBTX, jwtSecret string, accessTokenTTL, refreshTokenTTL time.Duration) *Handler {
-	return &Handler{service: newService(*NewStore(db), jwtSecret, accessTokenTTL, refreshTokenTTL)}
+func NewHandler(db *pgxpool.Pool, jwtSecret string, accessTokenTTL, refreshTokenTTL time.Duration) *Handler {
+	return &Handler{service: newService(db, jwtSecret, accessTokenTTL, refreshTokenTTL)}
 }
 
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/register", h.register)
 	r.Post("/login", h.login)
+	r.Post("/refresh", h.refresh)
 }
 
 type registerRequest struct {
@@ -45,6 +46,10 @@ type registerRequest struct {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
 }
 
 type tokenResponse struct {
@@ -86,6 +91,25 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	access, refresh, err := h.service.Login(r.Context(), req.Email, req.Password)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, tokenResponse{AccessToken: access, RefreshToken: refresh})
+}
+
+func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
+	var req refreshRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	if req.RefreshToken == "" {
+		httpx.WriteError(w, r, apperr.Validation(map[string]string{"refresh_token": "is required"}))
+		return
+	}
+
+	access, refresh, err := h.service.Refresh(r.Context(), req.RefreshToken)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
