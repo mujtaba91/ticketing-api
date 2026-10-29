@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type tokens struct {
@@ -56,20 +57,26 @@ func uniqueEmail() string {
 	return fmt.Sprintf("user%d@example.com", emailCounter.Add(1))
 }
 
+// user embeds tokens, so u.AccessToken works directly.
+type user struct {
+	tokens
+	Email string
+}
+
 // registerUser creates a new user and fails the test unless it gets a token pair back.
-func registerUser(t *testing.T) tokens {
+func registerUser(t *testing.T) user {
 	t.Helper()
 
-	var got tokens
+	u := user{Email: uniqueEmail()}
 	status := doJSON(t, http.MethodPost, "/auth/register", "", map[string]string{
 		"name":     "Test User",
-		"email":    uniqueEmail(),
+		"email":    u.Email,
 		"password": "password123",
-	}, &got)
+	}, &u.tokens)
 	if status != http.StatusCreated {
 		t.Fatalf("register: status %d, want %d", status, http.StatusCreated)
 	}
-	return got
+	return u
 }
 
 // refresh calls POST /auth/refresh; tokens are empty when the status is not 200.
@@ -79,4 +86,45 @@ func refresh(t *testing.T, refreshToken string) (int, tokens) {
 	var got tokens
 	status := doJSON(t, http.MethodPost, "/auth/refresh", "", map[string]string{"refresh_token": refreshToken}, &got)
 	return status, got
+}
+
+type idResponse struct {
+	ID string `json:"id"`
+}
+
+// createOrg makes the token's user the Owner of a new organization and returns its id.
+func createOrg(t *testing.T, accessToken string) string {
+	t.Helper()
+
+	var got idResponse
+	status := doJSON(t, http.MethodPost, "/organizations", accessToken, map[string]string{"name": "Test Org"}, &got)
+	if status != http.StatusCreated {
+		t.Fatalf("create organization: status %d, want %d", status, http.StatusCreated)
+	}
+	return got.ID
+}
+
+func addStaff(t *testing.T, ownerToken, orgID, email string) {
+	t.Helper()
+
+	status := doJSON(t, http.MethodPost, "/organizations/"+orgID+"/members", ownerToken, map[string]string{"email": email}, nil)
+	if status != http.StatusCreated {
+		t.Fatalf("add staff: status %d, want %d", status, http.StatusCreated)
+	}
+}
+
+// createEvent creates an event starting tomorrow and returns its id.
+func createEvent(t *testing.T, accessToken, orgID string, maxSeats int) string {
+	t.Helper()
+
+	var got idResponse
+	status := doJSON(t, http.MethodPost, "/organizations/"+orgID+"/events", accessToken, map[string]any{
+		"name":      "Test Event",
+		"max_seats": maxSeats,
+		"starts_at": time.Now().Add(24 * time.Hour),
+	}, &got)
+	if status != http.StatusCreated {
+		t.Fatalf("create event: status %d, want %d", status, http.StatusCreated)
+	}
+	return got.ID
 }
