@@ -43,15 +43,15 @@ type Member struct {
 	Role           Role
 }
 
-type orgStore struct {
+type Store struct {
 	db database.DBTX
 }
 
-func newStore(db database.DBTX) *orgStore {
-	return &orgStore{db: db}
+func NewStore(db database.DBTX) *Store {
+	return &Store{db: db}
 }
 
-func (s *orgStore) CreateOrganization(ctx context.Context, name string) (Organization, error) {
+func (s *Store) CreateOrganization(ctx context.Context, name string) (Organization, error) {
 	var o Organization
 	err := s.db.QueryRow(ctx, "INSERT INTO organizations (name) VALUES ($1) RETURNING id, name", name).
 		Scan(&o.ID, &o.Name)
@@ -61,7 +61,7 @@ func (s *orgStore) CreateOrganization(ctx context.Context, name string) (Organiz
 	return o, nil
 }
 
-func (s *orgStore) AddMember(ctx context.Context, orgID, userID string, role Role) (Member, error) {
+func (s *Store) AddMember(ctx context.Context, orgID, userID string, role Role) (Member, error) {
 	m := Member{OrganizationID: orgID, UserID: userID, Role: role}
 	_, err := s.db.Exec(ctx,
 		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)",
@@ -73,7 +73,7 @@ func (s *orgStore) AddMember(ctx context.Context, orgID, userID string, role Rol
 }
 
 // AddMemberByEmail resolves the email and inserts in one statement, so no row means no such user.
-func (s *orgStore) AddMemberByEmail(ctx context.Context, orgID, email string, role Role) (Member, error) {
+func (s *Store) AddMemberByEmail(ctx context.Context, orgID, email string, role Role) (Member, error) {
 	m := Member{OrganizationID: orgID, Role: role}
 	err := s.db.QueryRow(ctx,
 		`INSERT INTO organization_members (organization_id, user_id, role)
@@ -89,7 +89,7 @@ func (s *orgStore) AddMemberByEmail(ctx context.Context, orgID, email string, ro
 	return m, nil
 }
 
-func (s *orgStore) MemberRole(ctx context.Context, orgID, userID string) (Role, error) {
+func (s *Store) MemberRole(ctx context.Context, orgID, userID string) (Role, error) {
 	var role Role
 	err := s.db.QueryRow(ctx,
 		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
@@ -103,7 +103,7 @@ func (s *orgStore) MemberRole(ctx context.Context, orgID, userID string) (Role, 
 	return role, nil
 }
 
-func (s *orgStore) MembershipsByUser(ctx context.Context, userID string) ([]Membership, error) {
+func (s *Store) MembershipsByUser(ctx context.Context, userID string) ([]Membership, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT o.id, o.name, m.role
 		 FROM organizations o

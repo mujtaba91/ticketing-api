@@ -18,11 +18,11 @@ const maxNameChars = 100
 
 type orgService struct {
 	db    *pgxpool.Pool
-	store *orgStore
+	store *Store
 }
 
 func newService(db *pgxpool.Pool) *orgService {
-	return &orgService{db: db, store: newStore(db)}
+	return &orgService{db: db, store: NewStore(db)}
 }
 
 // Create runs in one transaction so an organization never exists without its owner.
@@ -34,7 +34,7 @@ func (s *orgService) Create(ctx context.Context, caller auth.Caller, name string
 
 	var created Membership
 	err := database.WithTx(ctx, s.db, func(tx pgx.Tx) error {
-		txStore := newStore(tx)
+		txStore := NewStore(tx)
 		org, err := txStore.CreateOrganization(ctx, name)
 		if err != nil {
 			return err
