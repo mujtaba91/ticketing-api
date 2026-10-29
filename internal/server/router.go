@@ -13,6 +13,7 @@ import (
 	"github.com/mujtaba91/ticketing-api/internal/auth"
 	"github.com/mujtaba91/ticketing-api/internal/config"
 	"github.com/mujtaba91/ticketing-api/internal/httpx"
+	"github.com/mujtaba91/ticketing-api/internal/organization"
 )
 
 func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
@@ -22,6 +23,12 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 
 	r.Get("/health", health(pool))
 	r.Route("/auth", auth.NewHandler(pool, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL).Routes)
+
+	authMw := auth.NewAuthMiddleware(pool, cfg.JWTSecret)
+	r.Group(func(r chi.Router) {
+		r.Use(authMw.RequireAuth)
+		r.Route("/organizations", organization.NewHandler(pool).Routes)
+	})
 
 	return r
 }
