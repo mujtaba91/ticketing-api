@@ -15,10 +15,18 @@ func TestRefreshTokenReuseRevokesSession(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("first refresh: status %d, want %d", status, http.StatusOK)
 	}
+	status = doJSON(t, http.MethodGet, "/organizations", first.AccessToken, nil, nil)
+	if status != http.StatusOK {
+		t.Fatalf("access token before reuse: status %d, want %d", status, http.StatusOK)
+	}
 
 	status, _ = refresh(t, first.RefreshToken)
 	if status != http.StatusUnauthorized {
 		t.Fatalf("reusing the old token: status %d, want %d", status, http.StatusUnauthorized)
+	}
+	status = doJSON(t, http.MethodGet, "/organizations", first.AccessToken, nil, nil)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("access token after reuse: status %d, want %d", status, http.StatusUnauthorized)
 	}
 
 	// The rotated token was never reused, so this only fails if the whole session was revoked.
