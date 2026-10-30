@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
@@ -22,6 +23,9 @@ import (
 
 // baseURL is the address of the API under test, shared by every test in the package.
 var baseURL string
+
+// testPool lets a test check the database directly, not only the API's answers.
+var testPool *pgxpool.Pool
 
 func TestMain(m *testing.M) {
 	code, err := run(m)
@@ -66,6 +70,7 @@ func run(m *testing.M) (int, error) {
 		return 0, err
 	}
 	defer pool.Close()
+	testPool = pool
 
 	srv := httptest.NewServer(server.NewRouter(pool, config.Config{
 		JWTSecret:       "integration-test-secret-at-least-32-chars",

@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -127,4 +128,24 @@ func createEvent(t *testing.T, accessToken, orgID string, maxSeats int) string {
 		t.Fatalf("create event: status %d, want %d", status, http.StatusCreated)
 	}
 	return got.ID
+}
+
+// book calls POST /events/{id}/bookings and returns the status, so concurrent callers can collect it.
+func book(t *testing.T, accessToken, eventID string) int {
+	t.Helper()
+
+	return doJSON(t, http.MethodPost, "/events/"+eventID+"/bookings", accessToken, nil, nil)
+}
+
+// countActiveBookings reads the database directly, so it does not trust the API's own answers.
+func countActiveBookings(t *testing.T, eventID string) int {
+	t.Helper()
+
+	var n int
+	err := testPool.QueryRow(context.Background(),
+		"SELECT count(*) FROM bookings WHERE event_id = $1 AND cancelled_at IS NULL", eventID).Scan(&n)
+	if err != nil {
+		t.Fatalf("count active bookings: %v", err)
+	}
+	return n
 }
