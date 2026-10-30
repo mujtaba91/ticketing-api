@@ -30,7 +30,11 @@ func TestConcurrentBookingsNeverOversell(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			results <- book(t, u.AccessToken, event)
+			status, err := book(u.AccessToken, event)
+			if err != nil {
+				t.Errorf("book: %v", err)
+			}
+			results <- status
 		}()
 	}
 	close(start)

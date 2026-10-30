@@ -37,7 +37,7 @@ func TestRefreshTokenReuseRevokesSession(t *testing.T) {
 }
 
 func TestRefreshTokenConcurrentRefreshes(t *testing.T) {
-	const n = 2
+	const n = 10
 
 	type result struct {
 		status int
@@ -54,7 +54,10 @@ func TestRefreshTokenConcurrentRefreshes(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			status, got := refresh(t, first.RefreshToken)
+			status, got, err := tryRefresh(first.RefreshToken)
+			if err != nil {
+				t.Errorf("refresh: %v", err)
+			}
 			results <- result{status, got}
 		}()
 	}

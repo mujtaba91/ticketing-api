@@ -18,19 +18,28 @@ type tokens struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// doJSON sends body as JSON and decodes the response into out when out is not nil; it returns the status code.
+// doJSON is sendJSON for the test goroutine: any transport or decode error fails the test at once.
 func doJSON(t *testing.T, method, path, accessToken string, body, out any) int {
 	t.Helper()
 
+	status, err := sendJSON(method, path, accessToken, body, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return status
+}
+
+// sendJSON returns errors instead of calling t.Fatal, so goroutines can use it; t.Fatal works only on the test goroutine.
+func sendJSON(method, path, accessToken string, body, out any) (int, error) {
 	var reqBody bytes.Buffer
 	if body != nil {
 		if err := json.NewEncoder(&reqBody).Encode(body); err != nil {
-			t.Fatalf("encode request: %v", err)
+			return 0, fmt.Errorf("encode request: %w", err)
 		}
 	}
 	req, err := http.NewRequest(method, baseURL+path, &reqBody)
 	if err != nil {
-		t.Fatalf("new request: %v", err)
+		return 0, fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if accessToken != "" {
@@ -39,16 +48,16 @@ func doJSON(t *testing.T, method, path, accessToken string, body, out any) int {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("%s %s: %v", method, path, err)
+		return 0, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			t.Fatalf("%s %s: decode response with status %d: %v", method, path, resp.StatusCode, err)
+			return 0, fmt.Errorf("%s %s: decode response with status %d: %w", method, path, resp.StatusCode, err)
 		}
 	}
-	return resp.StatusCode
+	return resp.StatusCode, nil
 }
 
 var emailCounter atomic.Int64
@@ -84,9 +93,18 @@ func registerUser(t *testing.T) user {
 func refresh(t *testing.T, refreshToken string) (int, tokens) {
 	t.Helper()
 
-	var got tokens
-	status := doJSON(t, http.MethodPost, "/auth/refresh", "", map[string]string{"refresh_token": refreshToken}, &got)
+	status, got, err := tryRefresh(refreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return status, got
+}
+
+// tryRefresh is refresh for goroutines.
+func tryRefresh(refreshToken string) (int, tokens, error) {
+	var got tokens
+	status, err := sendJSON(http.MethodPost, "/auth/refresh", "", map[string]string{"refresh_token": refreshToken}, &got)
+	return status, got, err
 }
 
 type idResponse struct {
@@ -136,11 +154,9 @@ func createEventAt(t *testing.T, accessToken, orgID string, maxSeats int, starts
 	return got.ID
 }
 
-// book calls POST /events/{id}/bookings and returns the status, so concurrent callers can collect it.
-func book(t *testing.T, accessToken, eventID string) int {
-	t.Helper()
-
-	return doJSON(t, http.MethodPost, "/events/"+eventID+"/bookings", accessToken, nil, nil)
+// book takes no t and returns the error, because the concurrency test calls it from goroutines.
+func book(accessToken, eventID string) (int, error) {
+	return sendJSON(http.MethodPost, "/events/"+eventID+"/bookings", accessToken, nil, nil)
 }
 
 // countActiveBookings reads the database directly, so it does not trust the API's own answers.

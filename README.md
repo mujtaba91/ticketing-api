@@ -129,7 +129,7 @@ The integration tests in `tests/integration/` run against a real PostgreSQL star
 - **50 concurrent bookings on 10 seats:** exactly 10 get 201 and 40 get 409, and the database holds exactly 10 active bookings.
 - **Staff of org A on an event of org B:** 403. The same Staff user gets 200 on their own org's event, which proves the 403 comes from the org check.
 - **Refresh token reuse:** the whole session is revoked, including the newest refresh token and the access token.
-- **Two concurrent refreshes with the same token:** exactly one wins, and the winner's token is then revoked too.
+- **Ten concurrent refreshes with the same token:** exactly one wins, and the winner's token is then revoked too.
 - **Paging through events:** 25 events, 20 of them at the same start time, paged 10 at a time: every event appears exactly once and in order.
 
 CI runs `go vet`, golangci-lint, and the unit and integration tests with `-race` on every push.
