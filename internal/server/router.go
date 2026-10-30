@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mujtaba91/ticketing-api/internal/auth"
+	"github.com/mujtaba91/ticketing-api/internal/booking"
 	"github.com/mujtaba91/ticketing-api/internal/config"
 	"github.com/mujtaba91/ticketing-api/internal/event"
 	"github.com/mujtaba91/ticketing-api/internal/httpx"
@@ -33,6 +34,7 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 		r.Use(authMw.RequireAuth)
 		r.Route("/organizations", organization.NewHandler(pool).Routes)
 		events.ProtectedRoutes(r)
+		booking.NewHandler(pool).Routes(r)
 	})
 
 	return r
