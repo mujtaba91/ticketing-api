@@ -2,10 +2,15 @@ package server
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/mujtaba91/ticketing-api/docs"
 	"github.com/mujtaba91/ticketing-api/internal/config"
 )
 
@@ -48,5 +53,28 @@ func TestRouterErrorsUseUnifiedFormat(t *testing.T) {
 				t.Errorf("Allow %q, want %q", got, tt.wantAllow)
 			}
 		})
+	}
+}
+
+// The spec is hand-written, so this catches a route added to the router but not to the docs.
+func TestEveryRouteIsDocumented(t *testing.T) {
+	spec, err := fs.ReadFile(docs.FS, "openapi.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	router := NewRouter(nil, config.Config{JWTSecret: "test"}).(chi.Routes)
+
+	err = chi.Walk(router, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		route = strings.TrimSuffix(route, "/")
+		if strings.HasPrefix(route, "/docs") {
+			return nil
+		}
+		if !strings.Contains(string(spec), "\n  "+route+":\n") {
+			t.Errorf("%s %s is not in docs/openapi.yaml", method, route)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk routes: %v", err)
 	}
 }

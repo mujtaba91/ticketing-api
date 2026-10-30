@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/mujtaba91/ticketing-api/docs"
 	"github.com/mujtaba91/ticketing-api/internal/apperr"
 	"github.com/mujtaba91/ticketing-api/internal/auth"
 	"github.com/mujtaba91/ticketing-api/internal/booking"
@@ -28,6 +29,8 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	r.MethodNotAllowed(methodNotAllowed(r))
 
 	r.Get("/health", health(pool))
+	r.Get("/docs", serveDoc("index.html"))
+	r.Get("/docs/openapi.yaml", serveDoc("openapi.yaml"))
 	r.Route("/auth", auth.NewHandler(pool, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL).Routes)
 
 	events := event.NewHandler(pool)
@@ -61,6 +64,12 @@ func methodNotAllowed(root chi.Routes) http.HandlerFunc {
 			}
 		}
 		httpx.WriteMethodNotAllowed(w)
+	}
+}
+
+func serveDoc(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, docs.FS, name)
 	}
 }
 

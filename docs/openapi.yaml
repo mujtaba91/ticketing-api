@@ -1,0 +1,319 @@
+openapi: 3.1.0
+info:
+  title: ticketing-api
+  version: 1.0.0
+  description: Book event tickets; a seat is never booked twice, however many requests arrive at once.
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid, unauthorized, forbidden, not_found, conflict, method_not_allowed, internal]
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties: { type: string }
+              description: One message per rejected field, only on validation errors.
+
+    Tokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        role: { type: string, enum: [owner, staff] }
+
+    Member:
+      type: object
+      properties:
+        organization_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        role: { type: string, enum: [owner, staff] }
+
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        organization_id: { type: string, format: uuid }
+        name: { type: string }
+        max_seats: { type: integer }
+        starts_at: { type: string, format: date-time }
+
+    Booking:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        cancelled_at: { type: [string, "null"], format: date-time }
+
+  responses:
+    Invalid:
+      description: Invalid JSON or failed validation.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Missing, invalid, expired or revoked token.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: The caller is not allowed to act in this organization.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: The resource does not exist.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Conflict:
+      description: The request conflicts with the current state.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Create an account and log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, maxLength: 100 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, maxLength: 64 }
+      responses:
+        "201": { description: Registered, content: { application/json: { schema: { $ref: "#/components/schemas/Tokens" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200": { description: Logged in, content: { application/json: { schema: { $ref: "#/components/schemas/Tokens" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate the refresh token
+      description: Reusing an already rotated token revokes every session of the user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200": { description: New token pair, content: { application/json: { schema: { $ref: "#/components/schemas/Tokens" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /organizations:
+    get:
+      tags: [organizations]
+      summary: List the caller's organizations with their role
+      security: [{ bearer: [] }]
+      responses:
+        "200":
+          description: The caller's organizations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Organization" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [organizations]
+      summary: Create an organization; the caller becomes its owner
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Organization" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /organizations/{id}/members:
+    post:
+      tags: [organizations]
+      summary: Add a staff member by email (owner or admin only)
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: "#/components/parameters/id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Member" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /organizations/{id}/events:
+    post:
+      tags: [events]
+      summary: Create an event (owner, staff or admin)
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: "#/components/parameters/id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, max_seats, starts_at]
+              properties:
+                name: { type: string, maxLength: 100 }
+                max_seats: { type: integer, minimum: 1, maximum: 100000 }
+                starts_at: { type: string, format: date-time, description: Must be in the future. }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events:
+    get:
+      tags: [events]
+      summary: List all events, soonest first
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Event" } }
+
+  /events/{id}:
+    patch:
+      tags: [events]
+      summary: Rename or reschedule an event (owner, staff or admin of its organization)
+      description: max_seats cannot change, since shrinking it under existing bookings would oversell.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: "#/components/parameters/id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, maxLength: 100 }
+                starts_at: { type: string, format: date-time }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } } }
+        "400": { $ref: "#/components/responses/Invalid" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{id}/bookings:
+    post:
+      tags: [bookings]
+      summary: Book one seat
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: "#/components/parameters/id" }]
+      responses:
+        "201": { description: Booked, content: { application/json: { schema: { $ref: "#/components/schemas/Booking" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Sold out, already started, or the caller already has an active booking.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /bookings:
+    get:
+      tags: [bookings]
+      summary: List the caller's bookings, newest first, cancelled ones included
+      security: [{ bearer: [] }]
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Booking" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /bookings/{id}:
+    delete:
+      tags: [bookings]
+      summary: Cancel one of the caller's bookings
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: "#/components/parameters/id" }]
+      responses:
+        "204": { description: Cancelled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: No active booking with this id belongs to the caller.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /health:
+    get:
+      tags: [ops]
+      summary: Database connectivity check
+      responses:
+        "200": { description: Healthy }
+        "503": { description: Database unreachable }
