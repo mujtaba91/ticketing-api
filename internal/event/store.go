@@ -60,8 +60,15 @@ func (s *eventStore) UpdateEvent(ctx context.Context, id string, name *string, s
 		id, name, startsAt))
 }
 
-func (s *eventStore) ListEvents(ctx context.Context) ([]Event, error) {
-	rows, err := s.db.Query(ctx, "SELECT "+eventColumns+" FROM events ORDER BY starts_at, id")
+// ListEvents returns up to limit events after the cursor, or from the start when after is nil.
+func (s *eventStore) ListEvents(ctx context.Context, after *cursor, limit int) ([]Event, error) {
+	query := "SELECT " + eventColumns + " FROM events ORDER BY starts_at, id LIMIT $1"
+	args := []any{limit}
+	if after != nil {
+		query = "SELECT " + eventColumns + " FROM events WHERE (starts_at, id) > ($2, $3) ORDER BY starts_at, id LIMIT $1"
+		args = append(args, after.StartsAt, after.ID)
+	}
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("select events: %w", err)
 	}
@@ -70,6 +77,10 @@ func (s *eventStore) ListEvents(ctx context.Context) ([]Event, error) {
 		err := row.Scan(&e.ID, &e.OrganizationID, &e.Name, &e.MaxSeats, &e.StartsAt)
 		return e, err
 	})
+	// A cursor id that is not a uuid fails here, when Postgres casts it.
+	if isInvalidUUID(err) {
+		return nil, ErrInvalidCursor
+	}
 	if err != nil {
 		return nil, fmt.Errorf("scan events: %w", err)
 	}

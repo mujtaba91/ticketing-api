@@ -81,8 +81,31 @@ func (s *eventService) requireMember(ctx context.Context, caller auth.Caller, or
 	return err
 }
 
-func (s *eventService) List(ctx context.Context) ([]Event, error) {
-	return s.store.ListEvents(ctx)
+type page struct {
+	Events     []Event
+	NextCursor string
+}
+
+// List fetches one row more than limit, so it knows whether a next page exists without a count query.
+func (s *eventService) List(ctx context.Context, rawCursor string, limit int) (page, error) {
+	var after *cursor
+	if rawCursor != "" {
+		c, err := decodeCursor(rawCursor)
+		if err != nil {
+			return page{}, err
+		}
+		after = &c
+	}
+	events, err := s.store.ListEvents(ctx, after, limit+1)
+	if err != nil {
+		return page{}, err
+	}
+	if len(events) <= limit {
+		return page{Events: events}, nil
+	}
+	events = events[:limit]
+	last := events[limit-1]
+	return page{Events: events, NextCursor: cursor{StartsAt: last.StartsAt, ID: last.ID}.encode()}, nil
 }
 
 func (in createInput) validate() error {

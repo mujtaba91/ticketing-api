@@ -94,6 +94,15 @@ The organization role is looked up from the database on each request, not put in
 
 Admins skip the organization check. A non-member gets 403 rather than 404, because organizations and events are not secret.
 
+### `GET /events` uses keyset pagination, not OFFSET
+
+`?limit=` (default 20, max 100) and `?cursor=`, which is the `next_cursor` from the previous page and is null on the last page. The next page is fetched with `WHERE (starts_at, id) > (cursor) ORDER BY starts_at, id`, served by an index on `(starts_at, id)`.
+
+- **Why not OFFSET:** `OFFSET 10000` reads and throws away 10,000 rows, and an insert or delete between two requests shifts rows so a page skips or repeats one. A cursor always starts exactly after the last row seen.
+- **Why `id` in the key:** two events can start at the same time; `id` makes the order unique, so no event is skipped at a page boundary.
+- **The cost:** no "jump to page 7", only next. The cursor is base64 so clients treat it as opaque.
+- **No count query:** the API fetches `limit + 1` rows; the extra row only tells it whether a next page exists.
+
 ### One error format, nothing internal leaks
 
 Every error, including chi's own 404 and 405, has the same shape:
@@ -121,11 +130,12 @@ The integration tests in `tests/integration/` run against a real PostgreSQL star
 - **Staff of org A on an event of org B:** 403. The same Staff user gets 200 on their own org's event, which proves the 403 comes from the org check.
 - **Refresh token reuse:** the whole session is revoked, including the newest refresh token and the access token.
 - **Two concurrent refreshes with the same token:** exactly one wins, and the winner's token is then revoked too.
+- **Paging through events:** 25 events, 20 of them at the same start time, paged 10 at a time: every event appears exactly once and in order.
 
 CI runs `go vet`, golangci-lint, and the unit and integration tests with `-race` on every push.
 
 ## Left out on purpose
 
 - **HttpOnly cookies for browser clients:** tokens are returned in the JSON body, which suits API and mobile clients and keeps testing with curl simple.
-- **Pagination and filtering on the list endpoints.**
+- **Pagination on the other list endpoints and filtering:** an organization or a user has few rows; `GET /events` is the list that grows.
 - **Payments, email, caching and rate limiting:** outside the scope of a booking-correctness demo.

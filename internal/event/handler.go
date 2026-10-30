@@ -51,7 +51,8 @@ type eventResponse struct {
 }
 
 type listResponse struct {
-	Items []eventResponse `json:"items"`
+	Items      []eventResponse `json:"items"`
+	NextCursor *string         `json:"next_cursor"` // null on the last page
 }
 
 // @Summary Create an event (owner, staff or admin of the organization)
@@ -116,24 +117,36 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toResponse(e))
 }
 
-// @Summary List all events, soonest first
+// @Summary List events, soonest first, one page at a time
 // @Tags events
 // @Produce json
+// @Param limit query int false "Page size, 1-100" default(20)
+// @Param cursor query string false "next_cursor from the previous page"
 // @Success 200 {object} listResponse
+// @Failure 400 {object} httpx.errorBody
 // @Router /events [get]
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	list, err := h.service.List(r.Context())
+	limit, err := httpx.ParseLimit(r)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	p, err := h.service.List(r.Context(), r.URL.Query().Get("cursor"), limit)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
 
 	// make, not nil, so an empty list encodes as [] instead of null.
-	items := make([]eventResponse, 0, len(list))
-	for _, e := range list {
+	items := make([]eventResponse, 0, len(p.Events))
+	for _, e := range p.Events {
 		items = append(items, toResponse(e))
 	}
-	httpx.WriteJSON(w, http.StatusOK, listResponse{Items: items})
+	resp := listResponse{Items: items}
+	if p.NextCursor != "" {
+		resp.NextCursor = &p.NextCursor
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func toResponse(e Event) eventResponse {

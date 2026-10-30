@@ -118,11 +118,17 @@ func addStaff(t *testing.T, ownerToken, orgID, email string) {
 func createEvent(t *testing.T, accessToken, orgID string, maxSeats int) string {
 	t.Helper()
 
+	return createEventAt(t, accessToken, orgID, maxSeats, time.Now().Add(24*time.Hour))
+}
+
+func createEventAt(t *testing.T, accessToken, orgID string, maxSeats int, startsAt time.Time) string {
+	t.Helper()
+
 	var got idResponse
 	status := doJSON(t, http.MethodPost, "/organizations/"+orgID+"/events", accessToken, map[string]any{
 		"name":      "Test Event",
 		"max_seats": maxSeats,
-		"starts_at": time.Now().Add(24 * time.Hour),
+		"starts_at": startsAt,
 	}, &got)
 	if status != http.StatusCreated {
 		t.Fatalf("create event: status %d, want %d", status, http.StatusCreated)

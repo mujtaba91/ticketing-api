@@ -220,12 +220,33 @@
                 "tags": [
                     "events"
                 ],
-                "summary": "List all events, soonest first",
+                "summary": "List events, soonest first, one page at a time",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Page size, 1-100",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "next_cursor from the previous page",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/event.listResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.errorBody"
                         }
                     }
                 }
@@ -720,6 +741,10 @@
                     "items": {
                         "$ref": "#/definitions/event.eventResponse"
                     }
+                },
+                "next_cursor": {
+                    "description": "null on the last page",
+                    "type": "string"
                 }
             }
         },

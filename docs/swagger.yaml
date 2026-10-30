@@ -74,6 +74,9 @@ definitions:
         items:
           $ref: '#/definitions/event.eventResponse'
         type: array
+      next_cursor:
+        description: null on the last page
+        type: string
     type: object
   event.updateRequest:
     properties:
@@ -279,6 +282,16 @@ paths:
       - bookings
   /events:
     get:
+      parameters:
+      - default: 20
+        description: Page size, 1-100
+        in: query
+        name: limit
+        type: integer
+      - description: next_cursor from the previous page
+        in: query
+        name: cursor
+        type: string
       produces:
       - application/json
       responses:
@@ -286,7 +299,11 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/event.listResponse'
-      summary: List all events, soonest first
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      summary: List events, soonest first, one page at a time
       tags:
       - events
   /events/{id}:
