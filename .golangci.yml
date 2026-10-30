@@ -1,0 +1,28 @@
+version: "2"
+
+run:
+  # Lint the integration tests too, not only the default build.
+  build-tags:
+    - integration
+
+linters:
+  # On top of the defaults: errcheck, govet, ineffassign, staticcheck, unused.
+  enable:
+    - bodyclose
+    - errorlint
+    - misspell
+    - unconvert
+
+  settings:
+    staticcheck:
+      # The defaults, minus S1016: request/response structs stay separate types, not conversions.
+      checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022", "-S1016"]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/mujtaba91/ticketing-api

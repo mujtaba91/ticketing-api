@@ -22,5 +22,6 @@ test:
 test-integration:
 	go test -tags=integration ./tests/integration/...
 
+# Same version as CI, so no local install is needed.
 lint:
-	golangci-lint run
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run

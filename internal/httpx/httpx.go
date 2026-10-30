@@ -72,8 +72,8 @@ func Recoverer(next http.Handler) http.Handler {
 			if rec == nil {
 				return
 			}
-			// ErrAbortHandler is net/http's own signal to drop the connection.
-			if rec == http.ErrAbortHandler {
+			// ErrAbortHandler is net/http's own signal to drop the connection; recover returns it unwrapped.
+			if rec == http.ErrAbortHandler { //nolint:errorlint
 				panic(rec)
 			}
 			slog.ErrorContext(r.Context(), "panic recovered", requestAttrs(r, "panic", rec, "stack", string(debug.Stack()))...)

@@ -41,7 +41,7 @@ func doJSON(t *testing.T, method, path, accessToken string, body, out any) int {
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

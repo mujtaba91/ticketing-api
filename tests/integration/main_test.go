@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http/httptest"
@@ -40,8 +41,11 @@ func run(m *testing.M) (int, error) {
 	ctx := context.Background()
 
 	migrations, err := filepath.Glob("../../migrations/*.up.sql")
-	if err != nil || len(migrations) == 0 {
-		return 0, fmt.Errorf("find migrations: %v", err)
+	if err != nil {
+		return 0, fmt.Errorf("find migrations: %w", err)
+	}
+	if len(migrations) == 0 {
+		return 0, errors.New("find migrations: no .up.sql files")
 	}
 
 	// Same image as docker-compose.yml; the up migrations run as init scripts, in file name order.
