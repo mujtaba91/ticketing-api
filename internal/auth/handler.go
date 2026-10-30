@@ -57,6 +57,15 @@ type tokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// @Summary Create an account and log in
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body registerRequest true "New account"
+// @Success 201 {object} tokenResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 409 {object} httpx.errorBody
+// @Router /auth/register [post]
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -78,6 +87,15 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, tokenResponse{AccessToken: access, RefreshToken: refresh})
 }
 
+// @Summary Log in
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body loginRequest true "Credentials"
+// @Success 200 {object} tokenResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Router /auth/login [post]
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -98,6 +116,15 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, tokenResponse{AccessToken: access, RefreshToken: refresh})
 }
 
+// @Summary Rotate the refresh token; reusing an old one revokes every session
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body refreshRequest true "Current refresh token"
+// @Success 200 {object} tokenResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Router /auth/refresh [post]
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {

@@ -37,6 +37,16 @@ type listResponse struct {
 	Items []bookingResponse `json:"items"`
 }
 
+// @Summary Book one seat; 409 when sold out, started or already booked
+// @Tags bookings
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Event ID"
+// @Success 201 {object} bookingResponse
+// @Failure 401 {object} httpx.errorBody
+// @Failure 404 {object} httpx.errorBody
+// @Failure 409 {object} httpx.errorBody
+// @Router /events/{id}/bookings [post]
 func (h *Handler) book(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	caller := auth.CallerFrom(ctx)
@@ -48,6 +58,14 @@ func (h *Handler) book(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, toResponse(b))
 }
 
+// @Summary Cancel one of the caller's bookings
+// @Tags bookings
+// @Security BearerAuth
+// @Param id path string true "Booking ID"
+// @Success 204
+// @Failure 401 {object} httpx.errorBody
+// @Failure 404 {object} httpx.errorBody
+// @Router /bookings/{id} [delete]
 func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	caller := auth.CallerFrom(ctx)
@@ -58,6 +76,13 @@ func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// @Summary List the caller's bookings, cancelled ones included
+// @Tags bookings
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} listResponse
+// @Failure 401 {object} httpx.errorBody
+// @Router /bookings [get]
 func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	caller := auth.CallerFrom(ctx)

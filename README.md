@@ -21,6 +21,7 @@ This copies `.env.example` to `.env`, starts PostgreSQL, runs the migrations and
 | `make test` | Unit tests |
 | `make test-integration` | Integration tests against a real PostgreSQL in a container (needs Docker) |
 | `make lint` | golangci-lint, same pinned version as CI |
+| `make swagger` | Regenerate `docs/swagger.json` after changing handler annotations |
 | `make down` | Stop everything |
 
 ## Architecture
@@ -103,9 +104,14 @@ Every error, including chi's own 404 and 405, has the same shape:
 
 Services return typed `apperr` kinds, which map to status codes. Anything else is logged with the request ID and answered with a generic 500.
 
-### Hand-written OpenAPI instead of generated
+### Swagger is generated from the handlers
 
-The spec in `docs/openapi.yaml` is written by hand instead of being generated from annotation comments in the handlers. A unit test walks the router and fails if a route is missing from the spec, so the two can't drift apart silently.
+`make swagger` runs swag over the annotations above each handler and writes `docs/swagger.json`. Request and response fields come straight from the Go structs, so they can't go out of date. swag only writes the JSON and YAML files, no Go code, so it isn't a runtime dependency.
+
+Two checks keep the spec honest:
+
+- **CI:** regenerates the spec and fails if it differs from the committed one.
+- **A unit test:** walks the router and fails if a route has no annotations.
 
 ## Tests
 

@@ -1,7 +1,7 @@
-// Package docs embeds the hand-written OpenAPI spec and a Swagger UI page, so the binary serves its own docs.
+// Package docs embeds the swag-generated spec and a Swagger UI page, so the binary serves its own docs.
 package docs
 
 import "embed"
 
-//go:embed openapi.yaml index.html
+//go:embed swagger.json index.html
 var FS embed.FS

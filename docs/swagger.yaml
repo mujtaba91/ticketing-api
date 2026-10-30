@@ -1,0 +1,534 @@
+basePath: /
+definitions:
+  auth.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  auth.registerRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.tokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  booking.bookingResponse:
+    properties:
+      cancelled_at:
+        type: string
+      created_at:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+    type: object
+  booking.listResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/booking.bookingResponse'
+        type: array
+    type: object
+  event.createRequest:
+    properties:
+      max_seats:
+        type: integer
+      name:
+        type: string
+      starts_at:
+        type: string
+    type: object
+  event.eventResponse:
+    properties:
+      id:
+        type: string
+      max_seats:
+        type: integer
+      name:
+        type: string
+      organization_id:
+        type: string
+      starts_at:
+        type: string
+    type: object
+  event.listResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/event.eventResponse'
+        type: array
+    type: object
+  event.updateRequest:
+    properties:
+      name:
+        type: string
+      starts_at:
+        type: string
+    type: object
+  httpx.errorBody:
+    properties:
+      error:
+        $ref: '#/definitions/httpx.errorDetail'
+    type: object
+  httpx.errorDetail:
+    properties:
+      code:
+        type: string
+      fields:
+        additionalProperties:
+          type: string
+        type: object
+      message:
+        type: string
+    type: object
+  organization.Role:
+    enum:
+    - owner
+    - staff
+    type: string
+    x-enum-varnames:
+    - RoleOwner
+    - RoleStaff
+  organization.addStaffRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  organization.createRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  organization.listResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/organization.organizationResponse'
+        type: array
+    type: object
+  organization.memberResponse:
+    properties:
+      organization_id:
+        type: string
+      role:
+        $ref: '#/definitions/organization.Role'
+      user_id:
+        type: string
+    type: object
+  organization.organizationResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        $ref: '#/definitions/organization.Role'
+    type: object
+info:
+  contact: {}
+  description: Book event tickets; a seat is never booked twice, however many requests
+    arrive at once.
+  title: ticketing-api
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.tokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      summary: Log in
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Current refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.tokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      summary: Rotate the refresh token; reusing an old one revokes every session
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: New account
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/auth.tokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      summary: Create an account and log in
+      tags:
+      - auth
+  /bookings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/booking.listResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: List the caller's bookings, cancelled ones included
+      tags:
+      - bookings
+  /bookings/{id}:
+    delete:
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Cancel one of the caller's bookings
+      tags:
+      - bookings
+  /events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/event.listResponse'
+      summary: List all events, soonest first
+      tags:
+      - events
+  /events/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/event.updateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/event.eventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Rename or reschedule an event; max_seats cannot change
+      tags:
+      - events
+  /events/{id}/bookings:
+    post:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/booking.bookingResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Book one seat; 409 when sold out, started or already booked
+      tags:
+      - bookings
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Database connectivity check
+      tags:
+      - ops
+  /organizations:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/organization.listResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: List the caller's organizations with their role
+      tags:
+      - organizations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/organization.createRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/organization.organizationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Create an organization; the caller becomes its owner
+      tags:
+      - organizations
+  /organizations/{id}/events:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Event
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/event.createRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/event.eventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Create an event (owner, staff or admin of the organization)
+      tags:
+      - events
+  /organizations/{id}/members:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Staff email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/organization.addStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/organization.memberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.errorBody'
+      security:
+      - BearerAuth: []
+      summary: Add a staff member by email (owner or admin)
+      tags:
+      - organizations
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer " followed by the access token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

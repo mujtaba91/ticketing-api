@@ -17,6 +17,8 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+      # Fails when annotations changed but the committed spec was not regenerated.
+      - run: make swagger && git diff --exit-code docs/
 
   test:
     runs-on: ubuntu-latest

@@ -54,6 +54,19 @@ type listResponse struct {
 	Items []eventResponse `json:"items"`
 }
 
+// @Summary Create an event (owner, staff or admin of the organization)
+// @Tags events
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param body body createRequest true "Event"
+// @Success 201 {object} eventResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Failure 403 {object} httpx.errorBody
+// @Failure 404 {object} httpx.errorBody
+// @Router /organizations/{id}/events [post]
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -72,6 +85,19 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, toResponse(e))
 }
 
+// @Summary Rename or reschedule an event; max_seats cannot change
+// @Tags events
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Event ID"
+// @Param body body updateRequest true "Fields to change"
+// @Success 200 {object} eventResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Failure 403 {object} httpx.errorBody
+// @Failure 404 {object} httpx.errorBody
+// @Router /events/{id} [patch]
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	var req updateRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -90,6 +116,11 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toResponse(e))
 }
 
+// @Summary List all events, soonest first
+// @Tags events
+// @Produce json
+// @Success 200 {object} listResponse
+// @Router /events [get]
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	list, err := h.service.List(r.Context())
 	if err != nil {

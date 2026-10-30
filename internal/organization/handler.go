@@ -49,6 +49,16 @@ type memberResponse struct {
 	Role           Role   `json:"role"`
 }
 
+// @Summary Create an organization; the caller becomes its owner
+// @Tags organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body createRequest true "Organization"
+// @Success 201 {object} organizationResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Router /organizations [post]
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
@@ -66,6 +76,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, toResponse(m))
 }
 
+// @Summary List the caller's organizations with their role
+// @Tags organizations
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} listResponse
+// @Failure 401 {object} httpx.errorBody
+// @Router /organizations [get]
 func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	caller := auth.CallerFrom(ctx)
@@ -83,6 +100,20 @@ func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, listResponse{Items: items})
 }
 
+// @Summary Add a staff member by email (owner or admin)
+// @Tags organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param body body addStaffRequest true "Staff email"
+// @Success 201 {object} memberResponse
+// @Failure 400 {object} httpx.errorBody
+// @Failure 401 {object} httpx.errorBody
+// @Failure 403 {object} httpx.errorBody
+// @Failure 404 {object} httpx.errorBody
+// @Failure 409 {object} httpx.errorBody
+// @Router /organizations/{id}/members [post]
 func (h *Handler) addStaff(w http.ResponseWriter, r *http.Request) {
 	var req addStaffRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {

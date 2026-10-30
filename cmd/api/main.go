@@ -15,6 +15,14 @@ import (
 	"github.com/mujtaba91/ticketing-api/internal/server"
 )
 
+// @title          ticketing-api
+// @version        1.0
+// @description    Book event tickets; a seat is never booked twice, however many requests arrive at once.
+// @BasePath       /
+// @securityDefinitions.apikey BearerAuth
+// @in             header
+// @name           Authorization
+// @description    Type "Bearer " followed by the access token.
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 

@@ -30,7 +30,7 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 
 	r.Get("/health", health(pool))
 	r.Get("/docs", serveDoc("index.html"))
-	r.Get("/docs/openapi.yaml", serveDoc("openapi.yaml"))
+	r.Get("/docs/swagger.json", serveDoc("swagger.json"))
 	r.Route("/auth", auth.NewHandler(pool, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL).Routes)
 
 	events := event.NewHandler(pool)
@@ -73,6 +73,12 @@ func serveDoc(name string) http.HandlerFunc {
 	}
 }
 
+// @Summary Database connectivity check
+// @Tags ops
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Failure 503 {object} map[string]string
+// @Router /health [get]
 func health(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

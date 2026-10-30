@@ -56,11 +56,17 @@ func TestRouterErrorsUseUnifiedFormat(t *testing.T) {
 	}
 }
 
-// The spec is hand-written, so this catches a route added to the router but not to the docs.
+// Catches a route added to the router without swag annotations, or a spec not regenerated after one.
 func TestEveryRouteIsDocumented(t *testing.T) {
-	spec, err := fs.ReadFile(docs.FS, "openapi.yaml")
+	raw, err := fs.ReadFile(docs.FS, "swagger.json")
 	if err != nil {
 		t.Fatalf("read spec: %v", err)
+	}
+	var spec struct {
+		Paths map[string]map[string]any `json:"paths"`
+	}
+	if err := json.Unmarshal(raw, &spec); err != nil {
+		t.Fatalf("parse spec: %v", err)
 	}
 	router := NewRouter(nil, config.Config{JWTSecret: "test"}).(chi.Routes)
 
@@ -69,8 +75,8 @@ func TestEveryRouteIsDocumented(t *testing.T) {
 		if strings.HasPrefix(route, "/docs") {
 			return nil
 		}
-		if !strings.Contains(string(spec), "\n  "+route+":\n") {
-			t.Errorf("%s %s is not in docs/openapi.yaml", method, route)
+		if _, ok := spec.Paths[route][strings.ToLower(method)]; !ok {
+			t.Errorf("%s %s is not in docs/swagger.json; add swag annotations and run make swagger", method, route)
 		}
 		return nil
 	})
