@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/mujtaba91/ticketing-api/internal/apperr"
 	"github.com/mujtaba91/ticketing-api/internal/auth"
 	"github.com/mujtaba91/ticketing-api/internal/booking"
 	"github.com/mujtaba91/ticketing-api/internal/config"
@@ -22,6 +23,9 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(httpx.Recoverer)
+	// Set before any Route call, since chi copies these into sub-routers when they are mounted.
+	r.NotFound(notFound)
+	r.MethodNotAllowed(methodNotAllowed(r))
 
 	r.Get("/health", health(pool))
 	r.Route("/auth", auth.NewHandler(pool, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL).Routes)
@@ -38,6 +42,26 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	})
 
 	return r
+}
+
+var errRouteNotFound = apperr.NotFound("route not found")
+
+func notFound(w http.ResponseWriter, r *http.Request) {
+	httpx.WriteError(w, r, errRouteNotFound)
+}
+
+var methods = []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete}
+
+// methodNotAllowed rebuilds the Allow header, because chi does not pass the allowed methods to a custom handler.
+func methodNotAllowed(root chi.Routes) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, m := range methods {
+			if root.Match(chi.NewRouteContext(), m, r.URL.Path) {
+				w.Header().Add("Allow", m)
+			}
+		}
+		httpx.WriteMethodNotAllowed(w)
+	}
 }
 
 func health(pool *pgxpool.Pool) http.HandlerFunc {

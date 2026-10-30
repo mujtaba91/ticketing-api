@@ -83,6 +83,11 @@ func Recoverer(next http.Handler) http.Handler {
 	})
 }
 
+// WriteMethodNotAllowed has no apperr kind, since 405 is about routing, not the domain.
+func WriteMethodNotAllowed(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusMethodNotAllowed, errorBody{errorDetail{Code: "method_not_allowed", Message: "method not allowed"}})
+}
+
 func writeInternal(w http.ResponseWriter) {
 	WriteJSON(w, http.StatusInternalServerError, errorBody{errorDetail{Code: "internal", Message: "internal server error"}})
 }
